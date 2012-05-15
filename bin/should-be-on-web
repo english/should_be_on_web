@@ -1,0 +1,62 @@
+#!/usr/bin/env ruby
+
+require 'bundler/setup'
+
+require 'optparse'
+require 'methadone'
+require 'should_be_on_web'
+require 'csv'
+
+class App
+  include Methadone::Main
+  include Methadone::CLILogging
+
+  main do |catalog, on_web|
+    catalog = load_catalog(catalog)
+    on_web  = load_web_skus(on_web)
+
+    candidates = catalog.web_candidates(on_web, options['image-dir'], options['ignore-images'])
+
+    if candidates.empty?
+      puts 'Nothing!'
+    else
+      print_products candidates
+    end
+  end
+
+  def self.print_products(products)
+    output = CSV.generate(col_sep: "\t") do |csv|
+      csv << %w{sku name}
+      products.each do |product|
+        csv << [product.sku, product.name]
+      end
+    end
+    puts output
+  end
+
+  def self.load_catalog file
+    ShouldBeOnWeb::Catalog.from_xml(File.read(file))
+  end
+
+  def self.load_web_skus csv
+    skus = []
+    CSV.foreach csv, headers: true do |row|
+      skus << row['sku']
+    end
+
+    skus
+  end
+
+  options['image-dir'] = 'C:\bsmart\Images'
+
+  on('-i IMAGEDIR', '--image-dir', 'Specify bsmart image location')
+  on('--ignore-images', 'Dont check for images')
+  arg :catalog 
+  arg :on_web 
+
+  version ShouldBeOnWeb::VERSION
+
+  use_log_level_option
+
+  go!
+end
